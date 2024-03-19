@@ -1,6 +1,6 @@
 ---
 title: "Lab 7: Parking Garage Case Study"
-author: "Your Name"
+author: "Grant Parajuli (gap6)"
 jupyter: julia-1.10
 date: 2024-03-08
 categories: [Lab]
@@ -37,6 +37,76 @@ and also regular packages
 
 ```{julia}
 using Plots
+using Distributions
 Plots.default(; margin=5Plots.mm)
 ```
 
+
+# Uncertainty Analysis
+## Generate SOWs
+
+I use the same n_years of 20, and a discount_rate of 0.12. However I will take 10,000 samples of a normal distribution for the demand growth rate centered at 80 with a standard deviation of 40 cars/yr. This is a bit of a broad range of uncertainty, but I justify it by saying that we're in an an important era of technological innovation with electric vehicles, which may affect future car demand positively or negatively.
+
+```{julia}
+demand_growth_dist = Normal(80.0, 40.0)
+demand_growth_samples = [rand(demand_growth_dist) for _ in 1:10_000]
+
+# first I'll use 10 of these to make sure the algorithm works
+# later updated to 2000, similar to paper
+demand_growth_vals = first(demand_growth_samples, 2000)
+sows = [ParkingGarageSOW(; demand_growth_rate=rate, n_years=20, discount_rate=0.12) for rate in demand_growth_vals];
+```
+
+## Calculate NPVs
+
+Consider my sampled SOWs and the base case SOW.
+```{julia}
+n_levels = 2:12
+policies = [StaticPolicy(i) for i in n_levels]
+
+results = []
+
+for policy in policies
+    # take the mean of all SOWs for the current level (policy) and add it to the results
+    result_allsow = [simulate(sow, policy) for sow in sows]
+    push!(results, mean(result_allsow))
+end
+
+# base case SOW
+sow = ParkingGarageSOW(; demand_growth_rate=80.0, n_years=20, discount_rate=0.12)
+profits = [simulate(sow, policy) for policy in policies]
+```
+
+Plot the results on top of the original plot.
+
+```{julia}
+# base plot
+plot(
+    n_levels,
+    profits;
+    ylabel="NPV Profits [Million USD]",
+    xlabel="Number of levels",
+    legend=true,
+    size=(800, 400),
+    marker=:circle,
+    xticks=n_levels,
+    label="Traditional NPV",
+)
+# new plot
+plot!(
+    n_levels,
+    results;
+    ylabel="NPV Profits [Million USD]",
+    xlabel="Number of levels",
+    marker=:circle,
+    xticks=n_levels,
+    label="Recognizing Uncertainty"
+)
+hline!([0], label="0 NPV")
+```
+
+# Adapative Comparisons
+Compare single SOW fixed policy to adaptive policy.
+```{julia}
+# generate adaptive policy SOW
+```
